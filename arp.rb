@@ -67,7 +67,9 @@ class ARP
 	        puts "ARP Poisining started..."
 		     while true do
 		     	@v_packet.to_w(@ifname)
+		     	sleep(1)
 		     	@r_packet.to_w(@ifname)
+		     	sleep(1)
 		     end
 	end
 end
